@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="./icon-512.png">
 <link rel="icon" href="./icon-512.png">
 <script src="./support.js"></script>
+<script src="./skattetabell.js"></script>
 </head>
 <body>
 <x-dc>
@@ -43,17 +44,6 @@
       <sc-if value="{{ isLonTab }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-direction:column;gap:20px">
 
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
-            <div style="display:flex;flex-direction:column;gap:2px">
-              <div style="font-size:13px;font-weight:800;color:#201e1d">Skattesats</div>
-              <div style="font-size:11px;color:#7d7979">Hur mycket skatt du betalar, i %</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" step="0.1" value="{{ taxRate }}" onChange="{{ onTaxRateChange }}" style="width:70px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
-              <span style="font-size:14px;color:#201e1d">%</span>
-            </div>
-          </div>
-
           <div style="display:flex;flex-direction:column;gap:10px">
             <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#7d7979">Schema</div>
 
@@ -66,13 +56,22 @@
             <sc-if value="{{ noSchedule }}" hint-placeholder-val="{{ true }}">
               <label for="scheduleFile" style="border:2px dashed rgba(32,30,29,0.4);padding:24px 16px;text-align:center;display:flex;flex-direction:column;gap:6px;cursor:pointer">
                 <div style="font-weight:800;font-size:14px;color:#201e1d">Ladda upp schema</div>
-                <div style="font-size:12px;color:#7d7979">Excel eller CSV med kolumnerna Datum, Start, Slut (Rast valfritt)</div>
+                <div style="font-size:12px;color:#7d7979">Excel eller CSV med kolumnerna Datum, Start, Slut (Rast valfritt). Har filen både Aktivt schema och Närvaro används de klockade tiderna.</div>
               </label>
             </sc-if>
             <input id="scheduleFile" type="file" accept=".csv,.xlsx,.xls" onChange="{{ handleFile }}" style="display:none"/>
 
             <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
               <div style="padding:10px 12px;background:#fff2ef;border:1px solid #ec3013;color:#ae1800;font-size:12px">{{ parseError }}</div>
+            </sc-if>
+
+            <sc-if value="{{ hasManyMonths }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <sc-for list="{{ monthRows }}" as="m" hint-placeholder-count="2">
+                  <button onClick="{{ m.pick }}" style="{{ m.style }}">{{ m.label }}</button>
+                </sc-for>
+              </div>
+              <div style="font-size:11px;color:#7d7979">Lönen betalas i efterskott: juni jämförs med lönebeskedet för juli.</div>
             </sc-if>
           </div>
 
@@ -84,17 +83,125 @@
             <input type="number" step="0.01" value="{{ baseRate }}" onChange="{{ onBaseRateChange }}" style="width:90px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
           </div>
 
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#7d7979">Skatt</div>
+
+            <sc-if value="{{ taxIsKommun }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:13px;font-weight:800;color:#201e1d">Kommun</div>
+                    <div style="font-size:11px;color:#7d7979">Där du är folkbokförd</div>
+                  </div>
+                  <select value="{{ kommun }}" onChange="{{ onKommunChange }}" style="max-width:170px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;font-family:'Archivo';color:#201e1d">
+                    <option value="" label="Välj kommun"></option>
+                    <sc-for list="{{ kommunRows }}" as="k">
+                      <option value="{{ k.name }}" label="{{ k.name }}"></option>
+                    </sc-for>
+                  </select>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#201e1d;cursor:pointer">
+                  <input type="checkbox" checked="{{ churchMember }}" onChange="{{ onChurchChange }}" style="width:18px;height:18px;accent-color:#ec3013"/>
+                  Jag är medlem i Svenska kyrkan
+                </label>
+                <sc-if value="{{ hasTable }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-size:12px;color:#605d5d">Skattetabell {{ tableLabel }} ({{ taxYearLabel }}). Skatten dras enligt tabell, inte som fast procent — procenten stiger med månadens lön.</div>
+                </sc-if>
+                <sc-if value="{{ tableSpread }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12px;color:#ae1800">Kyrkoavgiften skiljer sig mellan församlingarna i din kommun. Tabellen som de flesta församlingar ligger på används.</div>
+                </sc-if>
+                <div style="display:flex;gap:14px;flex-wrap:wrap">
+                  <button onClick="{{ usePercent }}" style="background:none;border:none;padding:0;font-family:'Archivo';font-weight:800;font-size:12px;color:#ae1800;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em">Jag vet min procent</button>
+                  <button onClick="{{ usePayslip }}" style="background:none;border:none;padding:0;font-family:'Archivo';font-weight:800;font-size:12px;color:#ae1800;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em">Räkna ut från lönebesked</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ taxIsPercent }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:13px;font-weight:800;color:#201e1d">Skattesats</div>
+                    <div style="font-size:11px;color:#7d7979">Preliminär skatt ÷ bruttolön × 100</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input type="number" step="0.01" value="{{ taxRate }}" onChange="{{ onTaxRateChange }}" style="width:80px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
+                    <span style="font-size:14px;color:#201e1d">%</span>
+                  </div>
+                </div>
+                <button onClick="{{ useKommun }}" style="background:none;border:none;padding:0;text-align:left;font-family:'Archivo';font-weight:800;font-size:12px;color:#ae1800;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em">Använd skattetabell för min kommun</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ taxIsPayslip }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
+                <div style="font-size:12px;color:#605d5d">Skriv av två rader från ett lönebesked, vilken månad som helst.</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                  <div style="font-size:13px;font-weight:800;color:#201e1d">Bruttolön</div>
+                  <input type="number" step="0.01" value="{{ payslipGross }}" onChange="{{ onPayslipGrossChange }}" style="width:110px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                  <div style="font-size:13px;font-weight:800;color:#201e1d">Preliminär skatt</div>
+                  <input type="number" step="1" value="{{ payslipTax }}" onChange="{{ onPayslipTaxChange }}" style="width:110px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
+                </div>
+                <div style="font-size:12px;color:#201e1d">Skattesats: <span style="font-weight:800">{{ payslipRateLabel }}</span></div>
+                <button onClick="{{ useKommun }}" style="background:none;border:none;padding:0;text-align:left;font-family:'Archivo';font-weight:800;font-size:12px;color:#ae1800;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em">Använd skattetabell för min kommun</button>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onClick="{{ toggleAdvanced }}" style="background:none;border:none;padding:0;text-align:left;font-family:'Archivo';font-weight:800;font-size:11px;color:#7d7979;cursor:pointer;text-transform:uppercase;letter-spacing:0.08em">{{ advancedLabel }}</button>
+            <sc-if value="{{ showAdvanced }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <label style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4);font-size:13px;color:#201e1d;cursor:pointer">
+                  <input type="checkbox" checked="{{ breakIsPaid }}" onChange="{{ onBreakIsPaidChange }}" style="width:18px;height:18px;accent-color:#ec3013"/>
+                  <span>Rasten är betald (måltidsuppehåll)<br/><span style="font-size:11px;color:#7d7979">Vanlig rast är obetald och dras av enligt §6.1.</span></span>
+                </label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:13px;font-weight:800;color:#201e1d">Semesterlön per dag</div>
+                    <div style="font-size:11px;color:#7d7979">Från lönebeskedet: "Semesterlön betald ... a"</div>
+                  </div>
+                  <input type="number" step="0.01" value="{{ semesterPayPerDay }}" onChange="{{ onSemesterPayChange }}" style="width:100px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4);font-size:13px;color:#201e1d;cursor:pointer">
+                  <input type="checkbox" checked="{{ semesterersattningMonthly }}" onChange="{{ onSemesterersattningChange }}" style="width:18px;height:18px;accent-color:#ec3013"/>
+                  <span>Jag får semesterersättning varje månad<br/><span style="font-size:11px;color:#7d7979">Bara om det står på lönebeskedet varje månad. Då läggs 13 % till (§14.8).</span></span>
+                </label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#eae9e9;border:1px solid rgba(32,30,29,0.4)">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:13px;font-weight:800;color:#201e1d">Timmar per vecka</div>
+                    <div style="font-size:11px;color:#7d7979">Från anställningsbeviset. Styr karensen vid sjukdom (§15.4).</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input type="number" step="0.5" value="{{ weeklyHours }}" onChange="{{ onWeeklyHoursChange }}" style="width:70px;padding:8px 10px;border:1px solid rgba(32,30,29,0.4);background:#f3f2f2;font-size:14px;text-align:right;font-family:'Archivo';color:#201e1d"/>
+                    <span style="font-size:14px;color:#201e1d">h</span>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
           <sc-if value="{{ hasSchedule }}" hint-placeholder-val="{{ false }}">
             <div style="display:flex;flex-direction:column;gap:20px">
 
               <div style="display:flex;flex-direction:column;gap:4px;padding:18px;background:#201e1d;color:#f3f2f2">
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#bab6b6">Bruttolön denna period</div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#bab6b6">Bruttolön {{ periodLabel }}</div>
                 <div style="font-size:34px;font-weight:800;font-family:'Archivo'">{{ grossLabel }}</div>
-                <div style="font-size:12px;color:#bab6b6">{{ totalHoursLabel }} arbetade timmar · {{ shiftCountLabel }} pass</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(243,242,242,0.25)">
-                  <div style="font-size:12px;color:#bab6b6">Nettolön (efter {{ taxRateLabel }}% skatt)</div>
-                  <div style="font-size:20px;font-weight:800;font-family:'Archivo'">{{ netLabel }}</div>
-                </div>
+                <div style="font-size:12px;color:#bab6b6">{{ totalHoursLabel }} arbetade timmar · {{ shiftCountLabel }} pass{{ leaveSummary }}</div>
+                <sc-if value="{{ hasExclusions }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12px;color:#ff9783;margin-top:4px">Bruttolönen räknar inte med: {{ exclusionsLabel }}</div>
+                </sc-if>
+                <sc-if value="{{ taxKnown }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(243,242,242,0.25)">
+                    <div style="font-size:12px;color:#bab6b6">Nettolön (efter {{ taxRateLabel }}% skatt)</div>
+                    <div style="font-size:20px;font-weight:800;font-family:'Archivo'">{{ netLabel }}</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ taxUnknown }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12px;color:#ff9783;margin-top:10px;padding-top:10px;border-top:1px solid rgba(243,242,242,0.25)">Välj din kommun under Skatt, så visas nettolönen här.</div>
+                </sc-if>
               </div>
 
               <div style="display:flex;flex-direction:column">
@@ -105,60 +212,68 @@
                 <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:14px;color:#201e1d;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
                   <div>Timlön ({{ baseRateLabel }} kr/h)</div><div style="text-align:right">{{ totalHoursLabel }}</div><div style="text-align:right;font-weight:600">{{ baseAmountLabel }}</div>
                 </div>
-                <sc-if value="{{ hasOb50 }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ tierRows }}" as="t" hint-placeholder-count="3">
                   <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:14px;color:#201e1d;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
-                    <div>OB 50% ({{ ob50RateLabel }} kr/h)</div><div style="text-align:right">{{ ob50HoursLabel }}</div><div style="text-align:right;font-weight:600">{{ ob50AmountLabel }}</div>
+                    <div>{{ t.label }} ({{ t.rateLabel }} kr/h)</div><div style="text-align:right">{{ t.hoursLabel }}</div><div style="text-align:right;font-weight:600">{{ t.amountLabel }}</div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ hasSemesterersattning }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:14px;color:#201e1d;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
+                    <div>Semesterersättning 13 %</div><div></div><div style="text-align:right;font-weight:600">{{ semesterersattningLabel }}</div>
                   </div>
                 </sc-if>
-                <sc-if value="{{ hasOb70 }}" hint-placeholder-val="{{ false }}">
+                <sc-if value="{{ hasSemesterDays }}" hint-placeholder-val="{{ false }}">
                   <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:14px;color:#201e1d;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
-                    <div>OB 70% ({{ ob70RateLabel }} kr/h)</div><div style="text-align:right">{{ ob70HoursLabel }}</div><div style="text-align:right;font-weight:600">{{ ob70AmountLabel }}</div>
+                    <div>Semesterlön ({{ semesterPerDayLabel }} kr/dag)</div><div style="text-align:right">{{ semesterDaysLabel }}</div><div style="text-align:right;font-weight:600">{{ semesterPayLabel }}</div>
                   </div>
                 </sc-if>
-                <sc-if value="{{ hasOb100 }}" hint-placeholder-val="{{ false }}">
+                <sc-if value="{{ hasSickDays }}" hint-placeholder-val="{{ false }}">
                   <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:14px;color:#201e1d;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
-                    <div>OB 100% ({{ ob100RateLabel }} kr/h)</div><div style="text-align:right">{{ ob100HoursLabel }}</div><div style="text-align:right;font-weight:600">{{ ob100AmountLabel }}</div>
+                    <div>{{ sickLabel }}</div><div style="text-align:right">{{ sickHoursLabel }}</div><div style="text-align:right;font-weight:600">{{ sickAmountLabel }}</div>
+                  </div>
+                  <sc-if value="{{ hasKarens }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:12px;color:#7d7979;padding:6px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
+                      <div>Karensperiod (obetald)</div><div style="text-align:right">{{ karensHoursLabel }}</div><div></div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ sickNotIncluded }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:12px;color:#ae1800;padding:6px 0">Räknas inte in i bruttolönen än. Fyll i timmar per vecka under Inställningar, annars går karensen inte att dra och sjuklönen blir för hög.</div>
+                  </sc-if>
+                </sc-if>
+                <sc-if value="{{ hasOtherDays }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:12px;color:#7d7979;padding:10px 0;border-bottom:1px solid rgba(32,30,29,0.2)">
+                    <div>{{ otherDaysLabel }} annan frånvaro</div><div></div><div style="text-align:right">räknas inte med</div>
                   </div>
                 </sc-if>
                 <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:15px;color:#201e1d;font-weight:800;padding:12px 0 0">
-                  <div>Totalt</div><div></div><div style="text-align:right">{{ grossLabel }}</div>
+                  <div>Bruttolön</div><div></div><div style="text-align:right">{{ grossLabel }}</div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:13px;color:#7d7979;padding:8px 0 0">
-                  <div>Skatt ({{ taxRateLabel }}%)</div><div></div><div style="text-align:right">-{{ taxAmountLabel }}</div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:15px;color:#201e1d;font-weight:800;padding:8px 0 0;margin-top:4px;border-top:1px solid rgba(32,30,29,0.2)">
-                  <div>Nettolön</div><div></div><div style="text-align:right">{{ netLabel }}</div>
-                </div>
+                <sc-if value="{{ taxKnown }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:13px;color:#7d7979;padding:8px 0 0">
+                    <div>{{ taxLineLabel }}</div><div></div><div style="text-align:right">-{{ taxAmountLabel }}</div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;font-size:15px;color:#201e1d;font-weight:800;padding:8px 0 0;margin-top:4px;border-top:1px solid rgba(32,30,29,0.2)">
+                    <div>Nettolön</div><div></div><div style="text-align:right">{{ netLabel }}</div>
+                  </div>
+                </sc-if>
               </div>
 
               <div style="display:flex;flex-direction:column;gap:8px">
                 <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#7d7979">Pass</div>
                 <sc-for list="{{ shiftRows }}" as="row" hint-placeholder-count="3">
-                  <div style="border:1px solid rgba(32,30,29,0.4);background:#f8f4f4">
+                  <div style="border:1px solid rgba(32,30,29,0.4);background:{{ row.bg }}">
                     <div onClick="{{ row.toggle }}" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer">
                       <div>
-                        <div style="font-weight:800;font-size:13px;color:#201e1d">{{ row.dateLabel }}</div>
+                        <div style="font-weight:800;font-size:13px;color:#201e1d">{{ row.dateLabel }}<sc-if value="{{ row.tag }}" hint-placeholder-val="{{ false }}"><span style="margin-left:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:{{ row.tagColor }}">{{ row.tag }}</span></sc-if></div>
                         <div style="font-size:12px;color:#7d7979">{{ row.timeLabel }}</div>
                       </div>
                       <div style="font-weight:800;font-size:14px;color:#201e1d">{{ row.amountLabel }}</div>
                     </div>
                     <sc-if value="{{ row.expanded }}" hint-placeholder-val="{{ false }}">
                       <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:5px;font-size:12px;color:#605d5d;border-top:1px solid rgba(32,30,29,0.2);padding-top:10px">
-                        <sc-if value="{{ row.hasBase }}" hint-placeholder-val="{{ true }}">
-                          <div style="display:flex;justify-content:space-between"><span>Grundtid</span><span>{{ row.baseLabel }}</span></div>
-                        </sc-if>
-                        <sc-if value="{{ row.hasOb50 }}" hint-placeholder-val="{{ false }}">
-                          <div style="display:flex;justify-content:space-between"><span>OB 50%</span><span>{{ row.ob50Label }}</span></div>
-                        </sc-if>
-                        <sc-if value="{{ row.hasOb70 }}" hint-placeholder-val="{{ false }}">
-                          <div style="display:flex;justify-content:space-between"><span>OB 70%</span><span>{{ row.ob70Label }}</span></div>
-                        </sc-if>
-                        <sc-if value="{{ row.hasOb100 }}" hint-placeholder-val="{{ false }}">
-                          <div style="display:flex;justify-content:space-between"><span>OB 100%</span><span>{{ row.ob100Label }}</span></div>
-                        </sc-if>
-                        <sc-if value="{{ row.hasBreak }}" hint-placeholder-val="{{ false }}">
-                          <div style="display:flex;justify-content:space-between;color:#9b9797"><span>Rast avdragen</span><span>{{ row.breakLabel }}</span></div>
-                        </sc-if>
+                        <sc-for list="{{ row.lines }}" as="l" hint-placeholder-count="2">
+                          <div style="display:flex;justify-content:space-between;color:{{ l.color }}"><span>{{ l.label }}</span><span>{{ l.value }}</span></div>
+                        </sc-for>
                       </div>
                     </sc-if>
                   </div>
@@ -223,7 +338,7 @@
             <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#bab6b6">Vad har jag kvar?</div>
             <sc-if value="{{ hasNet }}" hint-placeholder-val="{{ false }}">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;color:#bab6b6">Nettolön ({{ taxRateLabel }}% skatt)</div>
+                <div style="font-size:12px;color:#bab6b6">Nettolön ({{ taxRateLabel }} % skatt)</div>
                 <div style="font-size:14px;font-weight:600">{{ netLabel }}</div>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:2px solid rgba(243,242,242,0.3)">
@@ -231,8 +346,8 @@
                 <div style="font-size:20px;font-weight:800;color:{{ leftoverColor }}">{{ leftoverLabel }}</div>
               </div>
             </sc-if>
-            <sc-if value="{{ !hasNet }}" hint-placeholder-val="{{ true }}">
-              <div style="font-size:12px;color:#bab6b6">Ladda upp ett schema och ange skattesats under fliken Lön för att se vad du har kvar.</div>
+            <sc-if value="{{ noNet }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:12px;color:#bab6b6">Ladda upp ett schema och välj kommun under fliken Lön för att se vad du har kvar.</div>
             </sc-if>
           </div>
 
@@ -309,6 +424,21 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;baseRate&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:177.44,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:50,&quot;max&quot;:400,&quot;step&quot;:0.01,&quot;section&quot;:&quot;Lön&quot;}}">
+// ============================================================================
+// Löneberäkningen nedan är en rakt-av-portning av den publika Lönetracker-appen
+// (repo abboud-said/lonetracker: lib/rules.ts, holidays.ts, calc.ts, parse.ts,
+// semester.ts) så att den här privata appen räknar exakt likadant:
+//   - OB enligt Detaljhandelsavtalet §8.1 (18.15–20.00 50 %, efter 20.00 70 %,
+//     lördag efter 12.00 100 %, söndag/helgdag 100 %, jul-/nyårs-/midsommarafton
+//     som lördag)
+//   - svenska helgdagar, pass över midnatt dag för dag
+//   - rasten läggs mitt i passet och dras från de OB-nivåer den hamnar i
+//   - Aktivt schema och Närvaro kombineras (senaste start, tidigaste slut)
+//   - skatt från Skatteverkets skattetabell per kommun (skattetabell.js)
+//   - semesterlön per dag, semesterersättning 13 %, sjuklön §15.4 med karens
+//   - en månad i taget, eftersom ett lönebesked täcker en månad
+// ============================================================================
+
 function toMinutes(t){
   if(t==null) return null;
   const s = String(t).trim();
@@ -316,13 +446,196 @@ function toMinutes(t){
   const iso = s.match(/T(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if(iso) return (+iso[1])*60 + (+iso[2]);
   const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if(!m) {
-    const n = parseFloat(s.replace(',','.'));
-    if(isFinite(n) && n>0 && n<2) return Math.round(n*24*60);
-    return null;
-  }
-  return (+m[1])*60 + (+m[2]);
+  if(m) return (+m[1])*60 + (+m[2]);
+  const n = parseFloat(s.replace(',','.'));
+  if(isFinite(n) && n>0 && n<2) return Math.round(n*24*60);
+  return null;
 }
+
+// ---- Helgdagar (lib/holidays.ts) -------------------------------------------
+function easterSunday(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31), day=((h+l-7*m+114)%31)+1;
+  return new Date(year,month-1,day);
+}
+function isoDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function shiftDate(base,days){ return new Date(base.getFullYear(),base.getMonth(),base.getDate()+days); }
+function saturdayBetween(year,fromMonth,fromDay){
+  const start=new Date(year,fromMonth-1,fromDay);
+  for(let i=0;i<7;i++){ const c=shiftDate(start,i); if(c.getDay()===6) return c; }
+  return start;
+}
+const HOLIDAY_CACHE = new Map();
+function daysFor(year){
+  if(HOLIDAY_CACHE.has(year)) return HOLIDAY_CACHE.get(year);
+  const easter=easterSunday(year), midsummerDay=saturdayBetween(year,6,20);
+  const holidays=new Set([
+    isoDate(new Date(year,0,1)), isoDate(new Date(year,0,6)),
+    isoDate(shiftDate(easter,-2)), isoDate(easter), isoDate(shiftDate(easter,1)),
+    isoDate(new Date(year,4,1)), isoDate(shiftDate(easter,39)), isoDate(shiftDate(easter,49)),
+    isoDate(new Date(year,5,6)), isoDate(midsummerDay), isoDate(saturdayBetween(year,10,31)),
+    isoDate(new Date(year,11,25)), isoDate(new Date(year,11,26)),
+  ]);
+  const eves=new Set([ isoDate(new Date(year,11,24)), isoDate(new Date(year,11,31)), isoDate(shiftDate(midsummerDay,-1)) ]);
+  const r={holidays,eves}; HOLIDAY_CACHE.set(year,r); return r;
+}
+function isHelgdag(iso){ return daysFor(+iso.slice(0,4)).holidays.has(iso); }
+function isSaturdayEve(iso){ return daysFor(+iso.slice(0,4)).eves.has(iso); }
+function addDays(iso,n){ const [y,m,d]=iso.split('-').map(Number); return isoDate(new Date(y,m-1,d+n)); }
+function weekdayOf(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).getDay(); }
+function daysBetween(a,b){
+  const [ay,am,ad]=a.split('-').map(Number), [by,bm,bd]=b.split('-').map(Number);
+  return Math.round((new Date(by,bm-1,bd)-new Date(ay,am-1,ad))/86400000);
+}
+
+// ---- Regler (lib/rules.ts) -------------------------------------------------
+function classifyDay(iso){
+  if(isHelgdag(iso)) return 'holiday';
+  const dow=weekdayOf(iso);
+  if(dow===0) return 0;
+  if(isSaturdayEve(iso)) return 'eve';
+  return dow;
+}
+const RULESET = {
+  tiers:[ {id:'ob50',label:'OB 50%',percent:50}, {id:'ob70',label:'OB 70%',percent:70}, {id:'ob100',label:'OB 100%',percent:100} ],
+  windows:[
+    {days:[1,2,3,4,5], from:18*60+15, to:20*60, tierId:'ob50'},
+    {days:[1,2,3,4,5], from:20*60, to:24*60, tierId:'ob70'},
+    {days:[6,'eve'], from:12*60, to:24*60, tierId:'ob100'},
+    {days:[0,'holiday'], from:0, to:24*60, tierId:'ob100'},
+  ],
+};
+const BASE_KEY='';
+function segmentsForDay(day){
+  const windows=RULESET.windows.filter(w=>w.days.includes(day)&&w.to>w.from).sort((a,b)=>a.from-b.from);
+  const segs=[]; let cursor=0;
+  for(const w of windows){
+    const from=Math.max(w.from,cursor), to=Math.min(w.to,1440);
+    if(to<=from) continue;
+    if(from>cursor) segs.push({from:cursor,to:from,tierId:null});
+    segs.push({from,to,tierId:w.tierId}); cursor=to;
+  }
+  if(cursor<1440) segs.push({from:cursor,to:1440,tierId:null});
+  return segs;
+}
+
+// ---- Beräkning (lib/calc.ts) -----------------------------------------------
+function splitShift(shift){
+  const out={[BASE_KEY]:0}; let cursor=shift.startMin;
+  while(cursor<shift.endMin){
+    const dayIndex=Math.floor(cursor/1440), dayStart=dayIndex*1440, chunkEnd=Math.min(shift.endMin,dayStart+1440);
+    const day=classifyDay(addDays(shift.date,dayIndex));
+    for(const seg of segmentsForDay(day)){
+      const overlap=Math.min(chunkEnd-dayStart,seg.to)-Math.max(cursor-dayStart,seg.from);
+      if(overlap>0){ const key=seg.tierId??BASE_KEY; out[key]=(out[key]??0)+overlap; }
+    }
+    cursor=chunkEnd;
+  }
+  return out;
+}
+function shiftSegments(shift){
+  const out=[]; let cursor=shift.startMin;
+  while(cursor<shift.endMin){
+    const dayIndex=Math.floor(cursor/1440), dayStart=dayIndex*1440, chunkEnd=Math.min(shift.endMin,dayStart+1440);
+    const day=classifyDay(addDays(shift.date,dayIndex));
+    for(const seg of segmentsForDay(day)){
+      const from=Math.max(cursor,seg.from+dayStart), to=Math.min(chunkEnd,seg.to+dayStart);
+      if(to>from) out.push({tierId:seg.tierId??BASE_KEY,minutes:to-from});
+    }
+    cursor=chunkEnd;
+  }
+  return out;
+}
+function computeShift(shift,settings){
+  const raw=splitShift(shift);
+  const breakMinutes=Math.max(0,shift.breakMin||0);
+  const deducted=settings.breakIsPaid?0:breakMinutes;
+  const perTier={...raw};
+  if(deducted>0){
+    // Rasten läggs som ett block mitt i passet och dras från de nivåer den
+    // hamnar i — stämde med arbetsgivarens siffror 28 av 31 dagar.
+    const middle=(shift.startMin+shift.endMin)/2, breakStart=middle-deducted/2, breakEnd=middle+deducted/2;
+    let cursor=shift.startMin;
+    while(cursor<shift.endMin){
+      const dayIndex=Math.floor(cursor/1440), dayStart=dayIndex*1440, chunkEnd=Math.min(shift.endMin,dayStart+1440);
+      const day=classifyDay(addDays(shift.date,dayIndex));
+      for(const seg of segmentsForDay(day)){
+        const segFrom=Math.max(cursor,seg.from+dayStart), segTo=Math.min(chunkEnd,seg.to+dayStart);
+        if(segTo<=segFrom) continue;
+        const overlap=Math.min(segTo,breakEnd)-Math.max(segFrom,breakStart);
+        if(overlap>0){ const key=seg.tierId??BASE_KEY; perTier[key]=Math.max(0,(perTier[key]??0)-overlap); }
+      }
+      cursor=chunkEnd;
+    }
+  }
+  const paidMinutes=Object.values(perTier).reduce((a,b)=>a+b,0);
+  const baseAmount=(paidMinutes/60)*settings.baseRate;
+  const tierAmounts={};
+  for(const tier of RULESET.tiers){
+    const minutes=perTier[tier.id]??0;
+    if(minutes>0) tierAmounts[tier.id]=(minutes/60)*settings.baseRate*(tier.percent/100);
+  }
+  const gross=baseAmount+Object.values(tierAmounts).reduce((a,b)=>a+b,0);
+  return { shift, paidMinutes, spanMinutes:shift.endMin-shift.startMin, breakMinutes,
+    missingBreak: breakMinutes===0 && shift.endMin-shift.startMin>5*60, perTier, baseAmount, tierAmounts, gross };
+}
+
+const SICK_RATE=0.8, KARENS_SHARE=0.2, SICK_PERIOD_DAYS=14, RELAPSE_DAYS=5;
+function computeSickPay(sickDays,settings,include){
+  include = include || (()=>true);
+  const perTier={}; let karensMinutes=0, paidMinutes=0, amount=0, daysBeyondPeriod=0;
+  const days=[...sickDays].sort((a,b)=>a.date.localeCompare(b.date));
+  const karensPerPeriod=Math.max(0,(settings.weeklyHours||0)*60*KARENS_SHARE);
+  let periodStart=null, previousDay=null, karensLeft=0;
+  for(const day of days){
+    const isNewPeriod = previousDay==null || daysBetween(previousDay,day.date)>RELAPSE_DAYS;
+    if(isNewPeriod){ periodStart=day.date; karensLeft=karensPerPeriod; }
+    previousDay=day.date;
+    const reported=include(day);
+    if(periodStart!=null && daysBetween(periodStart,day.date)>=SICK_PERIOD_DAYS){ if(reported) daysBeyondPeriod++; continue; }
+    const worked=computeShift(day,settings);
+    const segs=shiftSegments(day);
+    const segTotal=segs.reduce((a,b)=>a+b.minutes,0);
+    const scale = worked.paidMinutes>0 ? worked.paidMinutes/segTotal : 0;
+    for(const seg of segs){
+      let minutes=seg.minutes*scale;
+      if(karensLeft>0){ const swallowed=Math.min(karensLeft,minutes); karensLeft-=swallowed; if(reported) karensMinutes+=swallowed; minutes-=swallowed; }
+      if(minutes<=0 || !reported) continue;
+      perTier[seg.tierId]=(perTier[seg.tierId]??0)+minutes; paidMinutes+=minutes;
+      const tier=RULESET.tiers.find(t=>t.id===seg.tierId);
+      const hourly=settings.baseRate*(1+(tier?tier.percent/100:0));
+      amount+=(minutes/60)*hourly*SICK_RATE;
+    }
+  }
+  return {karensMinutes,paidMinutes,perTier,amount,daysBeyondPeriod};
+}
+
+const SEMESTER_PERCENT=13;
+function monthlySemesterersattning(workPay){ return (workPay*SEMESTER_PERCENT)/100; }
+
+function computeTotals(results,settings,leave,month,taxOf){
+  const within = d => month==null || d.date.startsWith(month);
+  const visibleLeave={ semester:leave.semester.filter(within), sick:leave.sick.filter(within), other:leave.other.filter(within) };
+  const perTier={}, tierAmounts={}; let paidMinutes=0, baseAmount=0, gross=0;
+  for(const r of results){
+    paidMinutes+=r.paidMinutes; baseAmount+=r.baseAmount; gross+=r.gross;
+    for(const [k,m] of Object.entries(r.perTier)) perTier[k]=(perTier[k]??0)+m;
+    for(const [k,a] of Object.entries(r.tierAmounts)) tierAmounts[k]=(tierAmounts[k]??0)+a;
+  }
+  const semesterersattning = settings.semesterersattningMonthly ? monthlySemesterersattning(gross) : 0;
+  gross+=semesterersattning;
+  const semesterPay = visibleLeave.semester.length*(settings.semesterPayPerDay||0);
+  gross+=semesterPay;
+  const sick=computeSickPay(leave.sick,settings,within);
+  const sickIncluded=(settings.weeklyHours||0)>0;
+  if(sickIncluded) gross+=sick.amount;
+  const tax = taxOf ? (taxOf(gross)??0) : gross*(settings.taxRate/100);
+  return { shifts:results.length, leave:visibleLeave, semesterPay, semesterersattning, sick, sickIncluded,
+    paidMinutes, perTier, baseAmount, tierAmounts, gross, tax, net:gross-tax };
+}
+
+// ---- Filläsning (lib/parse.ts) ---------------------------------------------
 async function readXlsxRows(arrayBuffer){
   const buf = new Uint8Array(arrayBuffer);
   const ru16 = o => buf[o] | (buf[o+1]<<8);
@@ -372,8 +685,7 @@ async function readXlsxRows(arrayBuffer){
   if(sharedXml){
     const sDoc = dp.parseFromString(sharedXml,'application/xml');
     Array.from(sDoc.getElementsByTagName('si')).forEach(si=>{
-      const text = Array.from(si.getElementsByTagName('t')).map(t=>t.textContent).join('');
-      sharedStrings.push(text);
+      sharedStrings.push(Array.from(si.getElementsByTagName('t')).map(t=>t.textContent).join(''));
     });
   }
   const sheetDoc = dp.parseFromString(sheetXml,'application/xml');
@@ -384,15 +696,11 @@ async function readXlsxRows(arrayBuffer){
     for(const c of Array.from(rowEl.children)){
       if(c.tagName!=='c') continue;
       const ref = c.getAttribute('r'); if(!ref) continue;
-      const letters = ref.match(/^[A-Z]+/)[0];
-      const col = colIndexOf(letters);
+      const col = colIndexOf(ref.match(/^[A-Z]+/)[0]);
       const t = c.getAttribute('t')||'n';
       const vEl = Array.from(c.children).find(ch=>ch.tagName==='v');
       let val='';
-      if(vEl){
-        const raw = vEl.textContent;
-        val = t==='s' ? (sharedStrings[+raw]||'') : raw;
-      }
+      if(vEl){ const raw = vEl.textContent; val = t==='s' ? (sharedStrings[+raw]||'') : raw; }
       arr[col] = val;
     }
     rows.push(arr);
@@ -406,50 +714,113 @@ function parseCsvText(text){
     const out=[]; let cur=''; let inQ=false;
     for(let i=0;i<line.length;i++){
       const ch=line[i];
-      if(inQ){
-        if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else inQ=false; }
-        else cur+=ch;
-      } else {
-        if(ch==='"') inQ=true;
-        else if(ch===delim){ out.push(cur); cur=''; }
-        else cur+=ch;
-      }
+      if(inQ){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else inQ=false; } else cur+=ch; }
+      else { if(ch==='"') inQ=true; else if(ch===delim){ out.push(cur); cur=''; } else cur+=ch; }
     }
     out.push(cur);
     return out;
   });
 }
-function daySegmentsFor(dow){
-  if(dow===0) return [{from:0,to:1440,rate:'ob100'}];
-  if(dow===6) return [{from:0,to:720,rate:'base'},{from:720,to:1440,rate:'ob100'}];
-  return [{from:0,to:1080,rate:'base'},{from:1080,to:1200,rate:'ob50'},{from:1200,to:1440,rate:'ob70'}];
-}
-function splitShift(startMin,endMin,dow){
-  const segs = daySegmentsFor(dow);
-  const out = {base:0,ob50:0,ob70:0,ob100:0};
-  for(const seg of segs){
-    const overlap = Math.min(endMin,seg.to)-Math.max(startMin,seg.from);
-    if(overlap>0) out[seg.rate]+=overlap;
+
+const DATE_HEADERS=['datum','date','dag','day'];
+const START_HEADERS=['start','från','fran','from','in','början','borjan','start time'];
+const END_HEADERS=['slut','end','till','to','out','end time'];
+const BREAK_HEADERS=['rast','break','paus','lunch','obetald rast'];
+const LEAVE_KINDS=[
+  {kind:'semester', headers:['semester','vacation']},
+  {kind:'sick', headers:['sjuk','sick']},
+  {kind:'other', headers:['tj ledig','f ledig','tf penning','föräldraledig']},
+];
+const GENERIC_LEAVE_HEADERS=['frånvaro','franvaro','heldagsfrånvaro','absence'];
+const normCell = c => String(c==null?'':c).trim().toLowerCase();
+const NO_LEAVE = () => ({semester:[],sick:[],other:[]});
+let ID_SEQ=0; const newId=()=>String(Date.now().toString(36))+'-'+(ID_SEQ++);
+
+// Aktivt schema och Närvaro läses båda; lönen följer överlappet — senaste
+// start, tidigaste slut. Dagar utan Närvaro (framtida) faller tillbaka på schemat.
+function rowsToShifts(rows){
+  let headerIdx=-1, dateCol=-1;
+  for(let i=0;i<rows.length;i++){
+    const dc=rows[i].findIndex(c=>DATE_HEADERS.includes(normCell(c)));
+    if(dc>-1){ headerIdx=i; dateCol=dc; break; }
   }
-  return out;
+  if(headerIdx===-1) throw new Error('Hittade ingen "Datum"-kolumn i filen.');
+  const headerRow=rows[headerIdx];
+  const indexesOf = names => headerRow.reduce((acc,c,idx)=>{ if(names.includes(normCell(c))) acc.push(idx); return acc; },[]);
+  const startIdxs=indexesOf(START_HEADERS), endIdxs=indexesOf(END_HEADERS);
+  const leaveCols=LEAVE_KINDS.map(k=>({kind:k.kind, idxs:indexesOf(k.headers)}));
+  const genericIdxs=indexesOf(GENERIC_LEAVE_HEADERS);
+  const blocks=startIdxs.map(start=>{
+    const end=endIdxs.filter(x=>x>start).sort((a,b)=>a-b)[0];
+    const nextStart=startIdxs.filter(x=>x>start).sort((a,b)=>a-b)[0];
+    const breakCol=headerRow.reduce((acc,c,idx)=>{
+      const inBlock = idx>start && (nextStart==null||idx<nextStart);
+      if(inBlock && BREAK_HEADERS.some(b=>normCell(c).includes(b))) acc.push(idx);
+      return acc;
+    },[])[0];
+    return {start,end,breakCol};
+  }).filter(b=>b.end!=null).sort((a,b)=>a.start-b.start);
+  if(blocks.length===0) throw new Error('Hittade ingen "Start"/"Slut"-kolumn i filen.');
+
+  const shifts=[], leave=NO_LEAVE();
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const row=rows[i]; const dateRaw=row[dateCol]; if(!dateRaw) continue;
+    const m=String(dateRaw).match(/(\d{4})-(\d{2})-(\d{2})/); if(!m) continue;
+    let startMin=null, rawEnd=null, breakMin=0;
+    for(const block of blocks){
+      const s=toMinutes(row[block.start]), e=toMinutes(row[block.end]);
+      if(s==null||e==null||s===e) continue;
+      startMin = startMin==null ? s : Math.max(startMin,s);
+      rawEnd = rawEnd==null ? e : Math.min(rawEnd,e);
+      const b = block.breakCol!=null ? (toMinutes(row[block.breakCol])??0) : 0;
+      breakMin=Math.max(breakMin,b);
+    }
+    if(startMin==null||rawEnd==null||startMin>=rawEnd) continue;
+    const scheduled=rawEnd-startMin-breakMin;
+    const byKind=leaveCols.map(c=>({kind:c.kind, minutes:c.idxs.reduce((sum,idx)=>sum+(toMinutes(row[idx])??0),0)}));
+    const generic=genericIdxs.reduce((max,idx)=>Math.max(max,toMinutes(row[idx])??0),0);
+    const named=byKind.reduce((sum,c)=>sum+c.minutes,0);
+    if(scheduled>0 && Math.max(named,generic)>=scheduled-2){
+      const best=byKind.reduce((a,b)=>b.minutes>a.minutes?b:a);
+      const endMin = rawEnd<=startMin ? rawEnd+1440 : rawEnd;
+      leave[best.minutes>0?best.kind:'other'].push({id:newId(),date:m[0],startMin,endMin,breakMin});
+      continue;
+    }
+    const endMin = rawEnd<=startMin ? rawEnd+1440 : rawEnd;
+    shifts.push({id:newId(),date:m[0],startMin,endMin,breakMin});
+  }
+  shifts.sort((a,b)=>a.date.localeCompare(b.date)||a.startMin-b.startMin);
+  const anyLeave=leave.semester.length+leave.sick.length+leave.other.length;
+  if(shifts.length===0 && anyLeave===0) throw new Error('Inga pass hittades i filen.');
+  for(const list of Object.values(leave)) list.sort((a,b)=>a.date.localeCompare(b.date));
+  return {shifts,leave};
 }
+
+// ---- Formatering ------------------------------------------------------------
 function hhmm(min){
   const m = ((min%1440)+1440)%1440;
   const h = Math.floor(m/60), mm = m%60;
   return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;
 }
 const MONTHS_SV = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+const MONTHS_LONG_SV = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
 const WEEKDAYS_SV = ['Sön','Mån','Tis','Ons','Tor','Fre','Lör'];
-function dateLabel(dateStr, dow){
+function dateLabel(dateStr){
   const [y,mo,d] = dateStr.split('-').map(Number);
-  return WEEKDAYS_SV[dow] + ' ' + d + ' ' + MONTHS_SV[mo-1];
+  return WEEKDAYS_SV[weekdayOf(dateStr)] + ' ' + d + ' ' + MONTHS_SV[mo-1];
 }
+function monthLabel(month){ const [y,m]=month.split('-').map(Number); return MONTHS_LONG_SV[m-1]+' '+y; }
 function sek(n){
   return new Intl.NumberFormat('sv-SE',{minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.round(n)) + ' kr';
 }
-function hrs(min){
-  return (min/60).toFixed(2).replace('.',',') + ' h';
+function sek2(n){
+  return new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n) + ' kr';
 }
+function hrs(min){ return (min/60).toFixed(2).replace('.',',') + ' h'; }
+function pct(n){ return n.toFixed(2).replace('.',','); }
+const ALL_MONTHS='all';
+function monthsOf(dates){ return [...new Set(dates.map(d=>d.slice(0,7)))].sort(); }
+
 const STORE_KEY = 'lonetracker_v1';
 // Utgifter ligger i en EGEN nyckel. De hör inte ihop med schemat och ska aldrig
 // skrivas över när ett nytt schema laddas upp.
@@ -463,33 +834,38 @@ function normalizePayments(arr){
     amount: (typeof p.amount === 'number' && isFinite(p.amount)) ? p.amount : (parseFloat(String(p.amount).replace(',','.')) || 0),
   }));
 }
-
-// Läser alltid utgifterna från sin egen nyckel. Saknas den (första gången efter
-// uppdateringen) flyttas de över från det gamla gemensamma lagret.
 function loadPayments(){
-  try{
-    const raw = localStorage.getItem(PAYMENTS_KEY);
-    if(raw!=null) return normalizePayments(JSON.parse(raw));
-  }catch(e){}
-  try{
-    const legacy = localStorage.getItem(STORE_KEY);
-    if(legacy) return normalizePayments(JSON.parse(legacy).payments);
-  }catch(e){}
+  try{ const raw = localStorage.getItem(PAYMENTS_KEY); if(raw!=null) return normalizePayments(JSON.parse(raw)); }catch(e){}
+  try{ const legacy = localStorage.getItem(STORE_KEY); if(legacy) return normalizePayments(JSON.parse(legacy).payments); }catch(e){}
   return [];
 }
+function savePayments(list){ try{ localStorage.setItem(PAYMENTS_KEY, JSON.stringify(list)); }catch(e){} }
 
-function savePayments(list){
-  try{ localStorage.setItem(PAYMENTS_KEY, JSON.stringify(list)); }catch(e){}
-}
+const numOr = (v,d) => (typeof v==='number' && isFinite(v)) ? v : d;
+const SETTING_KEYS = ['baseRate','taxMode','taxRate','kommun','churchMember','payslipGross','payslipTax','breakIsPaid','semesterPayPerDay','semesterersattningMonthly','weeklyHours','parkFreeHours','parkRate'];
 
 class Component extends DCLogic {
   state = {
     activeTab: 'lon',
     shifts: [],
+    leave: NO_LEAVE(),
     fileName: null,
     parseError: null,
+    monthChoice: null,
+    showAdvanced: false,
     baseRate: 177.44,
-    taxRate: 30,
+    // Skatt: tabell per kommun är det arbetsgivaren faktiskt drar efter.
+    // Stockholm utanför Svenska kyrkan = tabell 31, stämt mot riktiga lönebesked.
+    taxMode: 'kommun',
+    taxRate: 0,
+    kommun: 'Stockholm',
+    churchMember: false,
+    payslipGross: 0,
+    payslipTax: 0,
+    breakIsPaid: false,
+    semesterPayPerDay: 0,
+    semesterersattningMonthly: false,
+    weeklyHours: 0,
     payments: [],
     editingId: null,
     editName: '',
@@ -506,27 +882,40 @@ class Component extends DCLogic {
       const raw = localStorage.getItem(STORE_KEY);
       if(raw){
         const d = JSON.parse(raw);
+        const leave = d.leave && typeof d.leave==='object'
+          ? { semester:d.leave.semester||[], sick:d.leave.sick||[], other:d.leave.other||[] }
+          : NO_LEAVE();
+        // Sparad data från gamla versionen hade bara en fast procent (30 som
+        // gissning). Finns inget sparat läge används tabellen — den gissade
+        // procenten styrde den största siffran på sidan.
+        const taxMode = ['kommun','percent','payslip'].includes(d.taxMode) ? d.taxMode : 'kommun';
         this.setState({
-          shifts: d.shifts||[],
+          shifts: (d.shifts||[]).map(s=>({...s})),
+          leave,
           fileName: d.fileName||null,
-          baseRate: (d.baseRate!=null? d.baseRate : (this.props.baseRate ?? 177.44)),
-          taxRate: d.taxRate!=null ? d.taxRate : 30,
-          parkFreeHours: d.parkFreeHours!=null ? d.parkFreeHours : 3.5,
-          parkRate: d.parkRate!=null ? d.parkRate : 25,
+          baseRate: numOr(d.baseRate, this.props.baseRate ?? 177.44),
+          taxMode,
+          taxRate: numOr(d.taxRate, 0),
+          kommun: typeof d.kommun==='string' ? d.kommun : 'Stockholm',
+          churchMember: !!d.churchMember,
+          payslipGross: numOr(d.payslipGross,0),
+          payslipTax: numOr(d.payslipTax,0),
+          breakIsPaid: !!d.breakIsPaid,
+          semesterPayPerDay: numOr(d.semesterPayPerDay,0),
+          semesterersattningMonthly: !!d.semesterersattningMonthly,
+          weeklyHours: numOr(d.weeklyHours,0),
+          parkFreeHours: numOr(d.parkFreeHours,3.5),
+          parkRate: numOr(d.parkRate,25),
         });
       } else if(this.props.baseRate){
         this.setState({baseRate:this.props.baseRate});
       }
     }catch(e){}
-    // Utgifterna laddas separat, även om schemat ovan inte gick att läsa.
     const payments = loadPayments();
     savePayments(payments);
     this.setState({payments});
-    // Håll utgifterna i synk om appen är öppen i flera flikar/fönster samtidigt.
     if(this.__onStorage){ try{ window.removeEventListener('storage', this.__onStorage); }catch(e){} }
-    this.__onStorage = (e)=>{
-      if(e && e.key===PAYMENTS_KEY) this.setState({payments: loadPayments()});
-    };
+    this.__onStorage = (e)=>{ if(e && e.key===PAYMENTS_KEY) this.setState({payments: loadPayments()}); };
     try{ window.addEventListener('storage', this.__onStorage); }catch(e){}
   }
 
@@ -535,16 +924,15 @@ class Component extends DCLogic {
   }
 
   persist(patch){
-    // OBS: payments ingår medvetet INTE här. Schema/inställningar och utgifter
-    // lagras var för sig, så att en schemauppladdning aldrig kan radera utgifter.
-    const cur = {
-      shifts:this.state.shifts, fileName:this.state.fileName, baseRate:this.state.baseRate,
-      taxRate:this.state.taxRate,
-      parkFreeHours:this.state.parkFreeHours, parkRate:this.state.parkRate,
-    };
+    // OBS: payments ingår medvetet INTE här.
+    const cur = { shifts:this.state.shifts, leave:this.state.leave, fileName:this.state.fileName };
+    for(const k of SETTING_KEYS) cur[k]=this.state[k];
     const next = {...cur, ...patch};
     try{ localStorage.setItem(STORE_KEY, JSON.stringify(next)); }catch(e){}
   }
+
+  setSetting(key, value){ this.setState({[key]:value}); this.persist({[key]:value}); }
+  numFrom(e){ return parseFloat(String(e.target.value).replace(',','.')) || 0; }
 
   setTab(t){ this.setState({activeTab:t}); }
 
@@ -556,54 +944,9 @@ class Component extends DCLogic {
     reader.onload = async (ev) => {
       try{
         const rows = isCSV ? parseCsvText(ev.target.result) : await readXlsxRows(ev.target.result);
-        const norm = c => String(c==null?'':c).trim().toLowerCase();
-        let headerIdx=-1, dateCol=-1;
-        for(let i=0;i<rows.length;i++){
-          const dc = rows[i].findIndex(c=>norm(c)==='datum');
-          if(dc>-1){ headerIdx=i; dateCol=dc; break; }
-        }
-        if(headerIdx===-1) throw new Error('Hittade ingen "Datum"-kolumn i filen.');
-        const headerRow = rows[headerIdx];
-        const allIdx = kw => headerRow.reduce((acc,c,idx)=>{ if(norm(c)===kw) acc.push(idx); return acc; }, []);
-        const startIdxs = allIdx('start');
-        const slutIdxs = allIdx('slut');
-        // pair each Start with the nearest following Slut (handles sheets with two schedule blocks, e.g. "Aktivt schema" + "Närvaro")
-        const blocks = startIdxs.map(s=>{
-          const slut = slutIdxs.filter(x=>x>s).sort((a,b)=>a-b)[0];
-          const nextStart = startIdxs.filter(x=>x>s).sort((a,b)=>a-b)[0];
-          const rastCands = headerRow.reduce((acc,c,idx)=>{ if(norm(c).includes('rast') && idx>s && (nextStart==null||idx<nextStart)) acc.push(idx); return acc; }, []);
-          return { start:s, slut, rast: rastCands[0] };
-        }).filter(b=>b.slut!=null);
-        const sampleEnd = Math.min(rows.length, headerIdx+16);
-        for(const b of blocks){
-          let score=0;
-          for(let i=headerIdx+1;i<sampleEnd;i++){
-            if(toMinutes(rows[i][b.start])!=null && toMinutes(rows[i][b.slut])!=null) score++;
-          }
-          b.score = score;
-        }
-        // only "Aktivt schema" (the leftmost Start/Slut block) is used — Närvaro (actual
-        // clock-in) columns are ignored entirely, even as a fallback.
-        blocks.sort((a,b)=>a.start-b.start);
-        if(!blocks.length) throw new Error('Hittade ingen "Start"/"Slut"-kolumn i filen.');
-        const schemaBlock = blocks[0];
-        const shifts=[];
-        for(let i=headerIdx+1;i<rows.length;i++){
-          const r = rows[i];
-          const dateRaw = r[dateCol];
-          if(!dateRaw) continue;
-          const m = String(dateRaw).match(/(\d{4})-(\d{2})-(\d{2})/);
-          if(!m) continue;
-          const sm = toMinutes(r[schemaBlock.start]), em0 = toMinutes(r[schemaBlock.slut]);
-          const brk = schemaBlock.rast!=null ? (toMinutes(r[schemaBlock.rast])||0) : 0;
-          if(sm==null || em0==null || sm===em0) continue;
-          const em = em0<=sm ? em0+1440 : em0;
-          const dow = new Date(+m[1], +m[2]-1, +m[3]).getDay();
-          shifts.push({date:m[0], dow, startMin:sm, endMin:em, breakMin:brk});
-        }
-        shifts.sort((a,b)=> a.date.localeCompare(b.date) || a.startMin-b.startMin);
-        this.setState({shifts, fileName:file.name, parseError: shifts.length ? null : 'Inga pass hittades i filen.', expanded:{}});
-        this.persist({shifts, fileName:file.name});
+        const {shifts, leave} = rowsToShifts(rows);
+        this.setState({shifts, leave, fileName:file.name, parseError:null, expanded:{}, monthChoice:null});
+        this.persist({shifts, leave, fileName:file.name});
       }catch(err){
         this.setState({parseError: err.message || 'Kunde inte läsa filen.'});
       }
@@ -612,33 +955,15 @@ class Component extends DCLogic {
     e.target.value = '';
   }
 
-  clearSchedule(){ this.setState({shifts:[], fileName:null, parseError:null, expanded:{}}); this.persist({shifts:[], fileName:null}); }
+  clearSchedule(){
+    this.setState({shifts:[], leave:NO_LEAVE(), fileName:null, parseError:null, expanded:{}, monthChoice:null});
+    this.persist({shifts:[], leave:NO_LEAVE(), fileName:null});
+  }
 
   toggleExpand(i){ this.setState(s=>({expanded:{...s.expanded, [i]: !s.expanded[i]}})); }
 
-  onBaseRateChange(e){
-    const n = parseFloat(String(e.target.value).replace(',','.')) || 0;
-    this.setState({baseRate:n}); this.persist({baseRate:n});
-  }
-
-  onTaxRateChange(e){
-    const n = parseFloat(String(e.target.value).replace(',','.')) || 0;
-    this.setState({taxRate:n}); this.persist({taxRate:n});
-  }
-
-  onParkFreeHoursChange(e){
-    const n = parseFloat(String(e.target.value).replace(',','.')) || 0;
-    this.setState({parkFreeHours:n}); this.persist({parkFreeHours:n});
-  }
-  onParkRateChange(e){
-    const n = parseFloat(String(e.target.value).replace(',','.')) || 0;
-    this.setState({parkRate:n}); this.persist({parkRate:n});
-  }
-
   onNameChange(e){ this.setState({newPaymentName:e.target.value}); }
   onAmountChange(e){ this.setState({newPaymentAmount:e.target.value}); }
-  // Alla ändringar av utgifter går genom den här. Listan läses om från lagret
-  // först, så att ett gammalt fönster inte skriver över nyare utgifter.
   mutatePayments(fn){
     const stored = loadPayments();
     const cur = (stored.length===0 && this.state.payments.length>0) ? this.state.payments : stored;
@@ -671,138 +996,170 @@ class Component extends DCLogic {
     this.mutatePayments(list => list.map(p => p.id===id ? {...p, name, amount:amt} : p));
     this.setState({editingId:null, editName:'', editAmount:''});
   }
+
   renderVals(){
-    const baseRate = this.state.baseRate || 0;
-    let totalMin=0, ob50Min=0, ob70Min=0, ob100Min=0;
+    const S = this.state;
+    const settings = {
+      baseRate: S.baseRate||0, taxRate: S.taxRate||0, breakIsPaid: !!S.breakIsPaid,
+      semesterPayPerDay: S.semesterPayPerDay||0, semesterersattningMonthly: !!S.semesterersattningMonthly,
+      weeklyHours: S.weeklyHours||0,
+    };
+    const leave = S.leave || NO_LEAVE();
 
-    const shiftRows = this.state.shifts.map((s,i)=>{
-      const seg = splitShift(s.startMin, s.endMin, s.dow);
-      const segTotal = seg.base+seg.ob50+seg.ob70+seg.ob100;
-      const brk = s.breakMin||0;
-      const factor = segTotal>0 ? Math.max(0, segTotal-brk)/segTotal : 1;
-      const base = seg.base*factor, ob50 = seg.ob50*factor, ob70 = seg.ob70*factor, ob100 = seg.ob100*factor;
-      totalMin += base+ob50+ob70+ob100; ob50Min += ob50; ob70Min += ob70; ob100Min += ob100;
-      const amount = (base/60)*baseRate + (ob50/60)*baseRate*0.5 + (ob70/60)*baseRate*0.7 + (ob100/60)*baseRate*1.0;
-      return {
-        dateLabel: dateLabel(s.date, s.dow),
-        timeLabel: hhmm(s.startMin) + '–' + hhmm(s.endMin),
-        amountLabel: sek(amount),
-        expanded: !!this.state.expanded[i],
-        toggle: () => this.toggleExpand(i),
-        hasBase: base>0.4, baseLabel: hrs(base),
-        hasOb50: ob50>0.4, ob50Label: hrs(ob50),
-        hasOb70: ob70>0.4, ob70Label: hrs(ob70),
-        hasOb100: ob100>0.4, ob100Label: hrs(ob100),
-        hasBreak: brk>0, breakLabel: hrs(brk),
-      };
+    // En månad i taget — ett lönebesked täcker en månad.
+    const months = monthsOf([...S.shifts, ...leave.semester, ...leave.sick, ...leave.other].map(s=>s.date));
+    const month = S.monthChoice===ALL_MONTHS ? null
+      : (S.monthChoice!=null && months.includes(S.monthChoice)) ? S.monthChoice
+      : (months[months.length-1] ?? null);
+    const within = d => month==null || d.date.startsWith(month);
+    const visibleShifts = S.shifts.filter(within);
+    const results = visibleShifts.map(s=>computeShift(s,settings));
+
+    // Skatt
+    const SK = window.SKATTETABELL || {TABLES:{},KOMMUNER:[],taxFromTable:()=>null,TAX_YEAR:''};
+    let taxOf, tableNo=null, tableSpread=false;
+    if(S.taxMode==='kommun'){
+      const k = SK.KOMMUNER.find(x=>x.name===S.kommun);
+      if(k){ tableNo = S.churchMember ? k.churchTable : k.table; tableSpread = !!(S.churchMember && k.spread); taxOf = g => SK.taxFromTable(g, tableNo); }
+    }
+    const taxKnown = S.taxMode==='kommun' ? taxOf!=null : settings.taxRate>0;
+    const totals = computeTotals(results, settings, leave, month, taxOf);
+    const effectiveRate = totals.gross>0 ? (totals.tax/totals.gross)*100 : 0;
+
+    const mkBtn = active => 'padding:8px 12px;border:1px solid rgba(32,30,29,0.4);font-family:Archivo,sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;cursor:pointer;'
+      + (active ? 'background:#201e1d;color:#f3f2f2;' : 'background:#f3f2f2;color:#201e1d;');
+    const monthRows = months.map(m=>({ label: monthLabel(m), style: mkBtn(month===m), pick: ()=>this.setState({monthChoice:m, expanded:{}}) }));
+    monthRows.push({ label:'Alla', style: mkBtn(month==null), pick: ()=>this.setState({monthChoice:ALL_MONTHS, expanded:{}}) });
+
+    const tierRows = RULESET.tiers.filter(t=>(totals.perTier[t.id]||0)>0.4).map(t=>({
+      label:t.label, rateLabel: pct(settings.baseRate*t.percent/100), hoursLabel: hrs(totals.perTier[t.id]), amountLabel: sek(totals.tierAmounts[t.id]||0),
+    }));
+
+    // Pass + frånvarodagar i samma lista, i datumordning
+    const rowsAll = [];
+    results.forEach((r,i)=>{
+      const lines=[];
+      const base=r.perTier[BASE_KEY]||0;
+      if(base>0.4) lines.push({label:'Grundtid', value:hrs(base), color:'#605d5d'});
+      for(const t of RULESET.tiers){ const m=r.perTier[t.id]||0; if(m>0.4) lines.push({label:t.label, value:hrs(m)+' · '+sek(r.tierAmounts[t.id]||0), color:'#605d5d'}); }
+      if(r.breakMinutes>0) lines.push({label: settings.breakIsPaid?'Rast (betald)':'Rast avdragen', value:hrs(r.breakMinutes), color:'#9b9797'});
+      if(r.missingBreak) lines.push({label:'Över 5 h utan rast i filen', value:'', color:'#ae1800'});
+      rowsAll.push({ date:r.shift.date, start:r.shift.startMin, key:'w'+i, bg:'#f8f4f4',
+        dateLabel: dateLabel(r.shift.date), timeLabel: hhmm(r.shift.startMin)+'–'+hhmm(r.shift.endMin)+(r.shift.endMin>1440?' (över midnatt)':''),
+        amountLabel: sek(r.gross), tag: classifyDay(r.shift.date)==='holiday' ? 'Helgdag' : (classifyDay(r.shift.date)==='eve' ? 'Afton' : ''), tagColor:'#ae1800', lines });
     });
+    totals.leave.semester.forEach((d,i)=>rowsAll.push({ date:d.date, start:d.startMin, key:'s'+i, bg:'#eef2ea',
+      dateLabel: dateLabel(d.date), timeLabel: 'Semesterdag', amountLabel: settings.semesterPayPerDay>0 ? sek(settings.semesterPayPerDay) : '—',
+      tag:'Semester', tagColor:'#4b6b3a', lines: settings.semesterPayPerDay>0 ? [] : [{label:'Fyll i semesterlön per dag under Inställningar', value:'', color:'#ae1800'}] }));
+    totals.leave.sick.forEach((d,i)=>rowsAll.push({ date:d.date, start:d.startMin, key:'k'+i, bg:'#f5efe6',
+      dateLabel: dateLabel(d.date), timeLabel: 'Sjuk · '+hhmm(d.startMin)+'–'+hhmm(d.endMin), amountLabel: '80 %',
+      tag:'Sjuk', tagColor:'#8a5a00', lines:[{label:'Sjuklön 80 % av vad passet hade gett, efter karens', value:'', color:'#605d5d'}] }));
+    totals.leave.other.forEach((d,i)=>rowsAll.push({ date:d.date, start:d.startMin, key:'o'+i, bg:'#eae9e9',
+      dateLabel: dateLabel(d.date), timeLabel: 'Annan frånvaro · '+hhmm(d.startMin)+'–'+hhmm(d.endMin), amountLabel: '—',
+      tag:'Frånvaro', tagColor:'#7d7979', lines:[{label:'Betalas olika beroende på typ — kolla lönebeskedet', value:'', color:'#605d5d'}] }));
+    rowsAll.sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
+    const shiftRows = rowsAll.map(r=>({ ...r, expanded: !!S.expanded[r.key], toggle: ()=>this.toggleExpand(r.key) }));
 
-    const baseAmount = (totalMin/60)*baseRate;
-    const ob50Amount = (ob50Min/60)*baseRate*0.5;
-    const ob70Amount = (ob70Min/60)*baseRate*0.7;
-    const ob100Amount = (ob100Min/60)*baseRate*1.0;
-    const gross = baseAmount+ob50Amount+ob70Amount+ob100Amount;
+    const {semester,sick,other} = totals.leave;
+    const leaveBits=[];
+    if(semester.length) leaveBits.push(semester.length+(semester.length===1?' semesterdag':' semesterdagar'));
+    if(sick.length) leaveBits.push(sick.length+(sick.length===1?' sjukdag':' sjukdagar'));
+    if(other.length) leaveBits.push(other.length+(other.length===1?' dag annan frånvaro':' dagar annan frånvaro'));
+    const excluded=[];
+    if(sick.length>0 && !totals.sickIncluded) excluded.push('sjuklön (fyll i timmar per vecka)');
+    if(semester.length>0 && totals.semesterPay<=0) excluded.push('semesterlön (fyll i kr/dag)');
 
-    const taxRate = this.state.taxRate || 0;
-    const taxAmount = gross*(taxRate/100);
-    const netAmount = gross-taxAmount;
+    const paymentsTotal = S.payments.reduce((a,p)=>a+p.amount,0);
+    const hasNet = (S.shifts.length>0 || leave.semester.length+leave.sick.length>0) && taxKnown;
+    const leftover = hasNet ? totals.net-paymentsTotal : 0;
 
-    const paymentsTotal = this.state.payments.reduce((a,p)=>a+p.amount,0);
-    const hasNet = this.state.shifts.length>0;
-    const leftover = hasNet ? netAmount-paymentsTotal : 0;
-
-    const parkFreeHours = this.state.parkFreeHours!=null ? this.state.parkFreeHours : 3.5;
-    const parkRate = this.state.parkRate!=null ? this.state.parkRate : 25;
+    const parkFreeHours = S.parkFreeHours!=null ? S.parkFreeHours : 3.5;
+    const parkRate = S.parkRate!=null ? S.parkRate : 25;
     let parkTotal = 0, parkPaidShifts = 0;
-    const parkRows = this.state.shifts.map(s=>{
+    const parkRows = visibleShifts.map(s=>{
       const durationHours = (s.endMin-s.startMin)/60;
       const payableHours = Math.max(0, durationHours-parkFreeHours);
       const cost = payableHours*parkRate;
       if(cost>0.005) parkPaidShifts++;
       parkTotal += cost;
-      return {
-        dateLabel: dateLabel(s.date, s.dow),
-        durationLabel: durationHours.toFixed(2).replace('.',',') + ' h parkerad',
-        costLabel: cost>0.005 ? sek(cost) : 'Gratis',
-        costColor: cost>0.005 ? '#ae1800' : '#7d7979',
-      };
+      return { dateLabel: dateLabel(s.date), durationLabel: durationHours.toFixed(2).replace('.',',') + ' h parkerad',
+        costLabel: cost>0.005 ? sek(cost) : 'Gratis', costColor: cost>0.005 ? '#ae1800' : '#7d7979' };
     });
 
     const activeStyleBase = 'padding:16px 8px;display:flex;align-items:center;justify-content:center;gap:6px;border:none;background:transparent;cursor:pointer;font-family:Archivo,sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:0.03em;margin-top:-2px;';
+    const nav = t => activeStyleBase + (S.activeTab===t ? 'color:#ec3013;border-top:2px solid #ec3013;' : 'color:#7d7979;border-top:2px solid transparent;');
+    const payslipRate = S.payslipGross>0 && S.payslipTax>0 ? (S.payslipTax/S.payslipGross)*100 : 0;
+    const taxRateLabel = taxKnown ? pct(effectiveRate) : '–';
+    const hasSchedule = S.shifts.length>0 || leave.semester.length+leave.sick.length+leave.other.length>0;
 
     return {
-      isLonTab: this.state.activeTab==='lon',
-      isPaymentsTab: this.state.activeTab==='payments',
-      isParkTab: this.state.activeTab==='park',
-      goLon: () => this.setTab('lon'),
-      goPayments: () => this.setTab('payments'),
-      goPark: () => this.setTab('park'),
-      lonNavStyle: activeStyleBase + (this.state.activeTab==='lon' ? 'color:#ec3013;border-top:2px solid #ec3013;' : 'color:#7d7979;border-top:2px solid transparent;'),
-      paymentsNavStyle: activeStyleBase + (this.state.activeTab==='payments' ? 'color:#ec3013;border-top:2px solid #ec3013;' : 'color:#7d7979;border-top:2px solid transparent;'),
-      parkNavStyle: activeStyleBase + (this.state.activeTab==='park' ? 'color:#ec3013;border-top:2px solid #ec3013;' : 'color:#7d7979;border-top:2px solid transparent;'),
+      isLonTab: S.activeTab==='lon', isPaymentsTab: S.activeTab==='payments', isParkTab: S.activeTab==='park',
+      goLon: () => this.setTab('lon'), goPayments: () => this.setTab('payments'), goPark: () => this.setTab('park'),
+      lonNavStyle: nav('lon'), paymentsNavStyle: nav('payments'), parkNavStyle: nav('park'),
 
-      hasSchedule: this.state.shifts.length>0,
-      noSchedule: this.state.shifts.length===0,
-      fileName: this.state.fileName,
-      hasError: !!this.state.parseError,
-      parseError: this.state.parseError,
-      handleFile: (e)=>this.handleFile(e),
-      clearSchedule: ()=>this.clearSchedule(),
+      hasSchedule, noSchedule: !hasSchedule,
+      fileName: S.fileName, hasError: !!S.parseError, parseError: S.parseError,
+      handleFile: (e)=>this.handleFile(e), clearSchedule: ()=>this.clearSchedule(),
 
-      baseRate: baseRate,
-      baseRateLabel: baseRate.toFixed(2).replace('.',','),
-      onBaseRateChange: (e)=>this.onBaseRateChange(e),
+      hasManyMonths: months.length>1, monthRows,
+      periodLabel: month==null ? (months.length>1 ? 'alla månader' : (months[0] ? monthLabel(months[0]) : 'denna period')) : monthLabel(month),
 
-      taxRate: taxRate,
-      taxRateLabel: (Math.round(taxRate*10)/10).toString().replace('.',','),
-      onTaxRateChange: (e)=>this.onTaxRateChange(e),
-      taxAmountLabel: sek(taxAmount),
-      netLabel: sek(netAmount),
+      baseRate: settings.baseRate, baseRateLabel: pct(settings.baseRate),
+      onBaseRateChange: (e)=>this.setSetting('baseRate', this.numFrom(e)),
 
-      grossLabel: sek(gross),
-      totalHoursLabel: hrs(totalMin),
-      shiftCountLabel: String(this.state.shifts.length),
+      taxIsKommun: S.taxMode==='kommun', taxIsPercent: S.taxMode==='percent', taxIsPayslip: S.taxMode==='payslip',
+      useKommun: ()=>this.setSetting('taxMode','kommun'), usePercent: ()=>this.setSetting('taxMode','percent'),
+      usePayslip: ()=>this.setSetting('taxMode','payslip'),
+      kommun: S.kommun, kommunRows: SK.KOMMUNER, onKommunChange: (e)=>this.setSetting('kommun', e.target.value),
+      churchMember: !!S.churchMember, onChurchChange: (e)=>this.setSetting('churchMember', !!e.target.checked),
+      hasTable: tableNo!=null, tableLabel: String(tableNo??''), taxYearLabel: String(SK.TAX_YEAR), tableSpread,
+      taxRate: settings.taxRate, onTaxRateChange: (e)=>this.setSetting('taxRate', this.numFrom(e)),
+      payslipGross: S.payslipGross, payslipTax: S.payslipTax,
+      onPayslipGrossChange: (e)=>{ const g=this.numFrom(e); this.setState({payslipGross:g, taxRate: g>0&&S.payslipTax>0 ? (S.payslipTax/g)*100 : 0}); this.persist({payslipGross:g, taxRate: g>0&&S.payslipTax>0 ? (S.payslipTax/g)*100 : 0}); },
+      onPayslipTaxChange: (e)=>{ const t=this.numFrom(e); this.setState({payslipTax:t, taxRate: S.payslipGross>0&&t>0 ? (t/S.payslipGross)*100 : 0}); this.persist({payslipTax:t, taxRate: S.payslipGross>0&&t>0 ? (t/S.payslipGross)*100 : 0}); },
+      payslipRateLabel: payslipRate>0 ? pct(payslipRate)+' %' : 'Inte uträknad än',
 
-      baseAmountLabel: sek(baseAmount),
-      hasOb50: ob50Min>0.4, ob50HoursLabel: hrs(ob50Min), ob50AmountLabel: sek(ob50Amount), ob50RateLabel: (baseRate*0.5).toFixed(2).replace('.',','),
-      hasOb70: ob70Min>0.4, ob70HoursLabel: hrs(ob70Min), ob70AmountLabel: sek(ob70Amount), ob70RateLabel: (baseRate*0.7).toFixed(2).replace('.',','),
-      hasOb100: ob100Min>0.4, ob100HoursLabel: hrs(ob100Min), ob100AmountLabel: sek(ob100Amount), ob100RateLabel: baseRate.toFixed(2).replace('.',','),
+      showAdvanced: !!S.showAdvanced, toggleAdvanced: ()=>this.setState({showAdvanced:!S.showAdvanced}),
+      advancedLabel: (S.showAdvanced ? '▾ ' : '▸ ') + 'Inställningar: rast, semester, sjuklön',
+      breakIsPaid: !!S.breakIsPaid, onBreakIsPaidChange: (e)=>this.setSetting('breakIsPaid', !!e.target.checked),
+      semesterPayPerDay: S.semesterPayPerDay, onSemesterPayChange: (e)=>this.setSetting('semesterPayPerDay', this.numFrom(e)),
+      semesterersattningMonthly: !!S.semesterersattningMonthly, onSemesterersattningChange: (e)=>this.setSetting('semesterersattningMonthly', !!e.target.checked),
+      weeklyHours: S.weeklyHours, onWeeklyHoursChange: (e)=>this.setSetting('weeklyHours', this.numFrom(e)),
+
+      grossLabel: sek(totals.gross), totalHoursLabel: hrs(totals.paidMinutes), shiftCountLabel: String(results.length),
+      leaveSummary: leaveBits.length ? ' · '+leaveBits.join(' · ') : '',
+      hasExclusions: excluded.length>0, exclusionsLabel: excluded.join(', '),
+      taxKnown, taxUnknown: !taxKnown, taxRateLabel,
+      taxLineLabel: S.taxMode==='kommun' ? 'Preliminär skatt, tabell '+tableNo+' ('+taxRateLabel+' %)' : 'Skatt ('+taxRateLabel+' %)',
+      taxAmountLabel: sek(totals.tax), netLabel: sek(totals.net),
+
+      baseAmountLabel: sek(totals.baseAmount), tierRows,
+      hasSemesterersattning: totals.semesterersattning>0, semesterersattningLabel: sek(totals.semesterersattning),
+      hasSemesterDays: semester.length>0, semesterDaysLabel: semester.length+(semester.length===1?' dag':' dagar'),
+      semesterPerDayLabel: new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(settings.semesterPayPerDay), semesterPayLabel: totals.semesterPay>0 ? sek(totals.semesterPay) : '—',
+      hasSickDays: sick.length>0, sickLabel: totals.sickIncluded ? 'Sjuklön (80 %)' : 'Sjuklön högst', sickHoursLabel: hrs(totals.sick.paidMinutes),
+      sickAmountLabel: sek(totals.sick.amount), hasKarens: totals.sick.karensMinutes>0, karensHoursLabel: hrs(totals.sick.karensMinutes),
+      sickNotIncluded: !totals.sickIncluded,
+      hasOtherDays: other.length>0, otherDaysLabel: other.length+(other.length===1?' dag':' dagar'),
 
       shiftRows,
 
-      newPaymentName: this.state.newPaymentName,
-      newPaymentAmount: this.state.newPaymentAmount,
-      onNameChange: (e)=>this.onNameChange(e),
-      onAmountChange: (e)=>this.onAmountChange(e),
-      addPayment: ()=>this.addPayment(),
-      paymentRows: this.state.payments.map(p=>({
-        name: p.name,
-        amountLabel: sek(p.amount),
-        isEditing: this.state.editingId===p.id,
-        notEditing: this.state.editingId!==p.id,
-        editName: this.state.editName,
-        editAmount: this.state.editAmount,
-        onEditNameChange: (e)=>this.onEditNameChange(e),
-        onEditAmountChange: (e)=>this.onEditAmountChange(e),
-        startEdit: ()=>this.startEdit(p),
-        saveEdit: ()=>this.saveEdit(),
-        cancelEdit: ()=>this.cancelEdit(),
-        remove: ()=>this.removePayment(p.id),
+      newPaymentName: S.newPaymentName, newPaymentAmount: S.newPaymentAmount,
+      onNameChange: (e)=>this.onNameChange(e), onAmountChange: (e)=>this.onAmountChange(e), addPayment: ()=>this.addPayment(),
+      paymentRows: S.payments.map(p=>({
+        name: p.name, amountLabel: sek(p.amount),
+        isEditing: S.editingId===p.id, notEditing: S.editingId!==p.id,
+        editName: S.editName, editAmount: S.editAmount,
+        onEditNameChange: (e)=>this.onEditNameChange(e), onEditAmountChange: (e)=>this.onEditAmountChange(e),
+        startEdit: ()=>this.startEdit(p), saveEdit: ()=>this.saveEdit(), cancelEdit: ()=>this.cancelEdit(), remove: ()=>this.removePayment(p.id),
       })),
-      noPayments: this.state.payments.length===0,
-      paymentsTotalLabel: sek(paymentsTotal),
+      noPayments: S.payments.length===0, paymentsTotalLabel: sek(paymentsTotal),
 
-      hasNet,
-      leftoverLabel: sek(leftover),
-      leftoverColor: leftover<0 ? '#ff9783' : '#f3f2f2',
+      hasNet, noNet: !hasNet, leftoverLabel: sek(leftover), leftoverColor: leftover<0 ? '#ff9783' : '#f3f2f2',
 
-      parkFreeHours: parkFreeHours,
-      onParkFreeHoursChange: (e)=>this.onParkFreeHoursChange(e),
-      parkRate: parkRate,
-      onParkRateChange: (e)=>this.onParkRateChange(e),
-      parkRows,
-      parkTotalLabel: sek(parkTotal),
-      parkPaidShiftsLabel: String(parkPaidShifts),
+      parkFreeHours, onParkFreeHoursChange: (e)=>this.setSetting('parkFreeHours', this.numFrom(e)),
+      parkRate, onParkRateChange: (e)=>this.setSetting('parkRate', this.numFrom(e)),
+      parkRows, parkTotalLabel: sek(parkTotal), parkPaidShiftsLabel: String(parkPaidShifts),
     };
   }
 }
